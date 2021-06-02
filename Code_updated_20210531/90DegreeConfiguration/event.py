@@ -30,33 +30,6 @@ def spot2blk(stop):
 	else:
 		return ceil(stop / nUnit)
 
-def in_range(stop_idx, N):
-
-	if (side == 'double'):
-		
-		if (angle == 0) and (mode == 'long'):
-			if (stop_idx % 2 == 1):
-				return range( min(N, stop_idx + 2), min(N, stop_idx + 3) + 1 )
-			return range( min(N, stop_idx + 1), min(N, stop_idx + 2) + 1 )
-		
-		if (angle == 0) and (mode == 'short'):
-			if (stop_idx % 2 == 1):
-				return range( max(1, stop_idx - 2), stop_idx + 2 )
-			return range( max(1, stop_idx - 3), stop_idx )
-
-		if (angle == 90):
-			if (stop_idx % 2 == 1):
-				return range( max(1, stop_idx - 4), min(N, stop_idx + 5) + 1 )
-			return range( max(1, stop_idx - 5), min(N, stop_idx + 4) + 1 )
-
-	assert (side == 'single')
-	if (angle == 0) and (mode == 'long'):
-		return range( min(N, stop_idx + 1), min(N, stop_idx + 1) + 1)
-	if (angle == 0) and (mode == 'short'):
-		return range( max(1, stop_idx - 1), stop_idx )
-	assert (angle == 90)
-	return range( max(1, stop_idx - 2), min(N, stop_idx + 2) + 1 )
-
 def out_range(stop_idx, N):
 	
 	if (side == 'double'):
@@ -87,12 +60,6 @@ def out_range(stop_idx, N):
 class system():
 
 	def __init__(self, N, seedSERV = None, seedPOUT = None, seedPLIN = None, seedDRIV = None):
-
-		if spmatch:
-			try:
-				self.service_times = json.load( open('../MCM_20210315/service_times_%s_%s.json'%(N, filename), 'r') )
-			except:
-				print ('No reference service time data!')
 
 		if simType == 'cav':
 			self.timeSERV = ParamGen(Expo(rateSERV, seed = seedSERV))
@@ -151,10 +118,7 @@ class system():
 			assert side == 'single'
 			self.N = N
 
-		if angle == 90 and spmatch:
-			self.n = spot2blk(N) * CAR_LENGTH
-		else:
-			self.n = N * LOT_LENGTH
+		self.n = N * LOT_LENGTH
 
 		self.curr = 0.0
 		self.start_time = 0.0
@@ -183,58 +147,6 @@ class system():
 		
 	def add_event(self, event):
 		heappush( self.eventheap, event) 
-
-	def state_print(self):
-
-		print (self.curr, self.curr_vehicle.stop_idx, self.curr_typ)
-		x = []
-		if side == 'single':
-			y = [0 for _ in range(spot2blk(self.N))]
-		else:
-			assert side == 'double'
-			y = [0 for _ in range(spot2blk(self.half_N))]
-		if not (angle == 0 and mode == 'long'):
-			y.append(0)
-
-		for car in self.inservice:
-			if car is None:
-				x.append(0)
-			elif car.status == 3:
-				x.append(1)
-			elif car.status in [3.5, 4]:
-				x.append(2)
-			elif car.status == 2:
-				x.append(m_in + m_out)
-			else:
-				assert car.status == 5
-				x.append(3)
-
-		car = self.head
-		while car is not None:
-			if car.status in [1, 6]:
-				car.update_loc()
-				if np.abs( car.curr_loc % CAR_LENGTH - CAR_LENGTH ) < 1:
-					lane_block = ceil(car.curr_loc / CAR_LENGTH)
-				else:
-					lane_block = floor( car.curr_loc / CAR_LENGTH )
-				if lane_block > len(y):
-					print ('one vehicle is leaving ...')
-				else:
-					if y[lane_block - 1] != 0:
-						import pdb; pdb.set_trace()
-					if car.status == 1:
-						y[lane_block - 1] = car.stop_idx
-					else:
-						y[lane_block - 1] = self.N + 1
-			car = car.nex
-
-		print (x)
-		print (y)
-
-		if self.N <= 8:
-			for idx in range(len(x)):
-				if x[idx] == 1:
-					print (idx + 1, self.inservice[idx].serv_end)
 
 	def debug_print(self):
 
@@ -270,8 +182,6 @@ class system():
 	def idle_time_calc(self, curr_vehicle):
 
 		total = self.curr - curr_vehicle.enter_time 
-		if spmatch:
-			total += meanDRIV
 		if (total < curr_vehicle.prod_time) and np.abs(total - curr_vehicle.prod_time) > 21 * SMALL_INTERVAL:
 			import pdb; pdb.set_trace()
 		idle = max(0.0, total - curr_vehicle.prod_time)
@@ -337,93 +247,13 @@ class system():
 				import pdb; pdb.set_trace()
 
 			if self.debug:
-				self.state_print()
+				self.debug_print()
 				if curr_typ == 'enter_system' and curr_vehicle.idx is not None:
 					import pdb; pdb.set_trace()				
-				# if spmatch:
-				# 	self.state_print()
-				# 	if curr_typ == 'enter_system' and curr_vehicle.idx is not None:
-				# 		import pdb; pdb.set_trace()
-				# else:
-				# 	self.debug_print()
-				# 	import pdb; pdb.set_trace()
 
 		self.start_time = self.curr
 		return (self.outCount)
-
-	def run2(self):
-
-		while True: 
-
-			if self.curr - self.start_time >= self.debug_unit:
-				import pdb; pdb.set_trace()
-			
-			curr_event = heappop(self.eventheap)
-			curr_vehicle = curr_event.vehicle
-			curr_typ  = curr_event.typ
-			self.curr = float(curr_event.time)
-
-			if curr_typ == 'start_counting':
-				print (self.curr, self.inCount, self.outCount)
-				assert self.inCount >= self.outCount
-				assert self.curr == WARMUP_UNIT
-				self.start_time = self.curr
-				self.inCount = self.inCount - self.outCount
-				self.outCount = 0
-				self.add_event( event(self.curr + SIM_UNIT, None, 'record_replication') )
-				return
-
-			if curr_typ == 'record_replication':
-				print (self.curr, self.inCount, self.outCount)
-				self.add_event( event(self.curr + SIM_UNIT, None, 'record_replication'))
-				return (self.outCount)
-
-			self.curr_vehicle = curr_vehicle	
-			self.curr_typ = curr_typ		
-			try:
-				stop = curr_vehicle.stop
-			except AttributeError:
-				assert curr_typ == 'enter_system'
-
-			# print (self.curr, curr_vehicle.idx, curr_typ)
-
-			if VEHICLE_IDX is not None and curr_vehicle.idx == VEHICLE_IDX:
-				import pdb; pdb.set_trace()
-
-			################################### update system ###################################
-			if curr_typ == 'leave_system':
-				self.leave_system(curr_vehicle)
-
-			elif curr_typ == 'start_pulling_in':
-				self.start_pulling_in(curr_vehicle)
-
-			elif curr_typ == 'start_service':
-				self.start_service(curr_vehicle)
-			
-			elif curr_typ == 'prepare_pulling_out':
-				self.prepare_pulling_out(curr_vehicle)
-
-			elif curr_typ == 'finish_pulling_out':
-				self.finish_pulling_out(curr_vehicle)
-
-			else:
-				assert curr_typ == 'enter_system'
-				self.enter_system(curr_vehicle, debug_idx = VEHICLE_IDX)
-
-			if VEHICLE_IDX is not None and curr_vehicle.idx == VEHICLE_IDX:
-				import pdb; pdb.set_trace()
-
-			if self.debug:
-				if spmatch:
-					self.state_print()
-					if curr_typ == 'enter_system' and curr_vehicle.idx is not None:
-						import pdb; pdb.set_trace()
-				else:
-					self.debug_print()
-
-		self.start_time = self.curr
-		return (self.outCount)
-
+	
 	def leave_system(self, curr_vehicle):
 
 		curr_vehicle.update_loc()
@@ -442,9 +272,7 @@ class system():
 			curr_vehicle.nex = None
 
 		self.outCount += 1
-		if spmatch and angle == 90:
-			curr_vehicle.prod_time += ( (curr_vehicle.dest_to_stop - curr_vehicle.block_idx * CAR_LENGTH) / curr_vehicle.driv )
-		elif angle == 90:
+		if angle == 90:
 			curr_vehicle.prod_time += ( (curr_vehicle.dest_to_stop - (curr_vehicle.stop + dgap) * LOT_LENGTH) / curr_vehicle.driv )
 		else:
 			curr_vehicle.prod_time += ( (curr_vehicle.dest_to_stop - curr_vehicle.stop * LOT_LENGTH) / curr_vehicle.driv )
@@ -454,9 +282,6 @@ class system():
 		return
 
 	def start_pulling_in(self, curr_vehicle):
-
-		# if self.curr >= 34212. and curr_vehicle.stop == 5:
-		# 	import pdb; pdb.set_trace()
 
 		curr_vehicle.update_loc()
 
@@ -534,10 +359,7 @@ class system():
 					assert cp.nex.data.t > self.curr
 					delayed = True
 					req_time = max( req_time, cp.nex.data.t )
-				elif (spmatch and cp.data.v != 'D' and cp.data.v < rateDRIV and cp.nex.data.t - meanDRIV > self.curr):
-					delayed = True
-					req_time = max( req_time, cp.nex.data.t - meanDRIV )
-
+					
 		if delayed:
 			assert req_time > self.curr
 			curr_vehicle.traj = DLinkedList()
@@ -595,9 +417,6 @@ class system():
 
 	def prepare_pulling_out(self, curr_vehicle):
 
-		# if self.curr >= 255. and curr_vehicle.stop_idx == 1:
-		# 	import pdb; pdb.set_trace()
-
 		stop = curr_vehicle.stop
 		assert self.inservice[curr_vehicle.stop_idx - 1] == curr_vehicle
 
@@ -631,181 +450,6 @@ class system():
 					self.debug_speed.append( delay_speed )	
 			return
 
-		# vehicles near the entry (i.e. stop <= g_out + 1) might not be able to start an exit maneuver if there is a conflicting entering vehicle 
-		# this is a check at the lambda-transitions only (i.e. curr_vehicle.status > 3)
-		if spmatch and stop <= g_out + 1 and curr_vehicle.status > 3 and self.eventheap != []:
-		# if stop <= g_out + 1 and curr_vehicle.status > 3 and self.eventheap != []:	
-			broken = False
-			car_time = self.curr
-			heap_len = len(self.eventheap)
-			event_holder = []
-			while self.eventheap != []:
-				next_event = heappop(self.eventheap)
-				heappush(event_holder, next_event)
-				if next_event.time <= self.curr + 100 * SMALL_INTERVAL: 
-		# 			if next_event.typ == 'prepare_pulling_out' and stop <= g_out and next_event.vehicle.stop_idx > curr_vehicle.stop_idx:
-		# 				car_time = max(car_time, next_event.time + 1e-9)
-		# 				broken = True
-					if next_event.typ == 'enter_system' and self.waiting != []:
-						if not free_curb:
-							next_spot = - min(self.waiting)
-						else:
-							next_spot = min(self.waiting)
-						if idx2spot(next_spot) > curr_vehicle.stop:
-							# if (self.inservice[- min(self.waiting) - 1] is not None) and (self.inservice[- min(self.waiting) - 1].pout_start > self.curr - 1e-03) and (self.inservice[- min(self.waiting) - 1].pout_start != self.inservice[- min(self.waiting) - 1].serv_end):
-							# 	import pdb; pdb.set_trace() 
-							car_time = next_event.time + 1e-9
-							broken = True
-							break
-						elif idx2spot(next_spot) <= g_out:
-							# if (self.inservice[- min(self.waiting) - 1] is not None) and (self.inservice[- min(self.waiting) - 1].pout_start > self.curr - 1e-03) and (self.inservice[- min(self.waiting) - 1].pout_start != self.inservice[- min(self.waiting) - 1].serv_end):
-							# 	import pdb; pdb.set_trace()
-							car_time = next_event.time + 1e-9
-							broken = True
-							break
-		# 			else:
-		# 				try:
-		# 					if control == 'full' and next_event.typ == 'start_service' and stop <= g_out and next_event.vehicle.stop_idx > curr_vehicle.stop_idx and self.service_times[str(next_event.vehicle.stop_idx)][0] < meanDRIV:
-		# 						service_end = next_event.time + self.service_times[str(next_event.vehicle.stop_idx)][0]
-		# 						assert (not self.check_lane_zero_long(curr_vehicle, False)[0])
-		# 						if next_event.vehicle.stop <= g_out or self.check_lane_zero_long(next_event.vehicle, True, curr_time = service_end)[0] or self.check_enter_zero_long(self.curr + meanDRIV, next_event.vehicle.stop_idx) > self.curr + meanDRIV + 100 * SMALL_INTERVAL:
-		# 							pass
-		# 						else:
-		# 							car_time = max(car_time, self.curr + meanDRIV)
-		# 							broken = True
-		# 				except:
-		# 					pass
-
-		# 		elif control == 'full' and next_event.time <= self.curr + meanDRIV + 1e-5 and stop <= g_out:
-		# 			if next_event.typ == 'prepare_pulling_out' and next_event.vehicle.status == 3 and next_event.vehicle.stop_idx > curr_vehicle.stop_idx and curr_vehicle.status == 4:
-		# 				assert (not self.check_lane_zero_long(curr_vehicle, False)[0])
-		# 				if next_event.vehicle.stop <= g_out or self.check_lane_zero_long(next_event.vehicle, True, curr_time = next_event.time)[0] or (control == 'full' and self.check_enter_zero_long(self.curr + meanDRIV, next_event.vehicle.stop_idx) > self.curr + meanDRIV + 100 * SMALL_INTERVAL):
-		# 					pass
-		# 				else:
-		# 					car_time = max(car_time, self.curr + meanDRIV)
-		# 					broken = True
-		# 			elif next_event.typ == 'enter_system' and self.waiting != [] and (- min(self.waiting)) > curr_vehicle.stop_idx:
-		# 				if curr_vehicle.status == 3.5 or (control == 'full' and self.check_enter_zero_long(self.curr + meanDRIV, - min(self.waiting)) > self.curr + meanDRIV + 100 * SMALL_INTERVAL):
-		# 					pass
-		# 				else:
-		# 					car_time = max(car_time, next_event.time + 1e-9)
-		# 					broken = True
-		# 			elif next_event.typ == 'add_stop_idx' and next_event.vehicle.stop_idx > curr_vehicle.stop_idx:
-		# 				if curr_vehicle.status == 3.5 or (control == 'full' and self.check_enter_zero_long(self.curr + meanDRIV, next_event.vehicle.stop_idx) > self.curr + meanDRIV + 100 * SMALL_INTERVAL):
-		# 					pass
-		# 				else:
-		# 					car_time = max(car_time, next_event.time + 1e-5 + 1e-9)
-		# 					broken = True
-
-			for event_visited in event_holder:
-				self.add_event( event_visited )
-			assert heap_len == len(self.eventheap)
-
-			if broken:
-				assert car_time > self.curr
-				curr_vehicle.end_time = car_time
-				self.add_event( event(curr_vehicle.end_time, curr_vehicle, 'prepare_pulling_out') )
-				return
-
-		# this is continuing the check at mu-transitions only (i.e. curr_vehicle.status = 3)
-		# the criterion for closeness to entrance is changed to stop <= g_out because the vehicle's status is 3 now
-		# and the next replacement vehicle will enter earliest at the completion of the first step of exit maneuver 
-		# if this vehicle can start pulling out immediately
-		# if spmatch and control == 'full' and stop <= g_out and curr_vehicle.status == 3 and self.eventheap != []:
-		# 	broken = False
-		# 	car_time = self.curr 
-		# 	heap_len = len(self.eventheap)
-		# 	event_holder = []
-		# 	first_service = self.first_service
-		# 	if self.first_service is None:
-		# 		first_service = self.curr
-		# 	while self.eventheap != []:
-		# 		next_event = heappop(self.eventheap)
-		# 		heappush(event_holder, next_event)
-		# 		if next_event.time > self.curr + meanDRIV - (self.curr - first_service) % meanDRIV + 100 * SMALL_INTERVAL:
-		# 			break
-
-		# 		if next_event.typ == 'enter_system' and self.waiting != [] and (- min(self.waiting)) > curr_vehicle.stop_idx: 
-		# 			if self.check_enter_zero_long(next_event.time, - min(self.waiting)) > next_event.time + SMALL_INTERVAL:
-		# 				pass
-		# 			else:
-		# 				curr_vehicle.status = 3.5
-		# 				car_time = max(car_time, next_event.time + 1e-9)
-		# 				broken = True
-		# 		elif next_event.typ == 'add_stop_idx' and next_event.vehicle.stop_idx > curr_vehicle.stop_idx:
-		# 			if self.check_enter_zero_long(next_event.time, next_event.vehicle.stop_idx) > next_event.time + 100 * SMALL_INTERVAL:
-		# 				pass
-		# 			else:
-		# 				curr_vehicle.status = 3.5
-		# 				car_time = max(car_time, next_event.time + 1e-5 + 1e-9)
-		# 				broken = True				
-		# 		elif next_event.typ == 'prepare_pulling_out' and next_event.vehicle.stop_idx > curr_vehicle.stop_idx and next_event.vehicle.status < 4:
-		# 			if next_event.vehicle.status == 3 and next_event.time > self.curr + meanDRIV - (self.curr - first_service) % meanDRIV:
-		# 				assert next_event.time == next_event.vehicle.serv_end
-		# 				curr_vehicle.status = 3.5
-		# 			car_time = max(car_time, next_event.time + 1e-9)
-		# 			broken = True
-
-		# 	for event_visited in event_holder:
-		# 		self.add_event( event_visited )
-		# 	assert heap_len == len(self.eventheap)
-
-		# 	if broken:
-		# 		assert car_time > self.curr
-		# 		curr_vehicle.end_time = car_time
-		# 		self.add_event( event(curr_vehicle.end_time, curr_vehicle, 'prepare_pulling_out' ))
-		# 		return
-
-		# this is an optional check and only applies to double-sided design 
-		if spmatch and side == 'double' and self.eventheap != []:
-			broken = False
-			heap_len = len(self.eventheap)
-			event_holder = []
-			first_service = self.first_service
-			if self.first_service is None:
-				first_service = self.curr
-			while self.eventheap != []:
-				next_event = heappop(self.eventheap)
-				heappush(event_holder, next_event)
-				if curr_vehicle.status == 3 and next_event.time > self.curr + meanDRIV - (self.curr - first_service) % meanDRIV - 0.9 * SMALL_INTERVAL:
-					break
-				if curr_vehicle.status == 4 and next_event.time > self.curr + meanDRIV - SMALL_INTERVAL:
-					break
-				if curr_vehicle.stop == next_event.vehicle.stop and curr_vehicle.stop_idx < next_event.vehicle.stop_idx:
-					assert curr_vehicle.stop_idx + 1 == next_event.vehicle.stop_idx
-					if curr_vehicle.status == 3 and next_event.typ == 'prepare_pulling_out':
-						curr_vehicle.status = 4
-						curr_vehicle.end_time = self.curr + meanDRIV - (self.curr - first_service) % meanDRIV
-						self.add_event( event(curr_vehicle.end_time, curr_vehicle, 'prepare_pulling_out') )
-						broken = True
-						break	
-					if curr_vehicle.status == 4 and (next_event.typ == 'prepare_pulling_out' and (next_event.vehicle.status == 3 or 0 <= next_event.time - self.curr < 100 * SMALL_INTERVAL)):
-						curr_vehicle.end_time = self.curr + meanDRIV
-						self.add_event( event(curr_vehicle.end_time, curr_vehicle, 'prepare_pulling_out') )
-						broken = True
-						break
-					if curr_vehicle.status == 4 and next_event.typ == 'start_service' and 0 <= next_event.time - self.curr < 100 * SMALL_INTERVAL:
-						curr_vehicle.end_time = next_event.time + 1e-9
-						self.add_event( event(curr_vehicle.end_time, curr_vehicle, 'prepare_pulling_out') )
-						broken = True
-						break
-				if self.waiting != []:
-					if not free_curb:
-						next_spot = - min(self.waiting)
-					else:
-						next_spot = min(self.waiting)
-					if control == 'full' and curr_vehicle.stop_idx == 2 and next_event.typ == 'enter_system' and next_spot == 1:
-						curr_vehicle.end_time = next_event.time + 1e-9
-						self.add_event( event(curr_vehicle.end_time, curr_vehicle, 'prepare_pulling_out') )
-						broken = True
-						break
-			for event_visited in event_holder:
-				self.add_event( event_visited )	
-			if broken:
-				assert heap_len + 1 == len(self.eventheap)
-				return
-			assert heap_len == len(self.eventheap)
-
 		# Now, the current vehicle is ready to start the exit maneuver
 		curr_vehicle.status = 4
 		curr_vehicle.prev = prev
@@ -825,19 +469,7 @@ class system():
 		else:
 			self.head = curr_vehicle
 
-		if spmatch and first_attempt and meanDRIV - (curr_vehicle.serv_end - self.first_service) % meanDRIV > SMALL_INTERVAL:
-			assert simType == 'cav'
-			assert curr_vehicle.status == 4
-			curr_vehicle.status = 5
-			curr_vehicle.curr_loc = curr_vehicle.stop * LOT_LENGTH
-			curr_vehicle.dest_to_stop = self.n + CAR_LENGTH
-			curr_vehicle.pout_start = curr_vehicle.serv_end
-			curr_vehicle.pout_time = self.timePOUT.next() - (curr_vehicle.serv_end - self.first_service) % meanDRIV
-			curr_vehicle.pout_end = curr_vehicle.pout_time + curr_vehicle.pout_start
-			curr_vehicle.prod_time += curr_vehicle.pout_time
-			curr_vehicle.update_traj()
-		else:
-			curr_vehicle.start_out()
+		curr_vehicle.start_out()
 		
 		assert curr_vehicle.pout_end > self.curr
 		self.add_event( event( curr_vehicle.pout_end, curr_vehicle, 'finish_pulling_out') )
@@ -856,24 +488,11 @@ class system():
 
 		# lastly we schedule the replacement vehicles
 		new_vehicle = vehicle(self)
-
-		if spmatch:
-			assert simType == 'cav'
-			enter_time = self.curr + meanDRIV
-			if self.curr == curr_vehicle.serv_end or (first_attempt and meanDRIV - (curr_vehicle.serv_end - self.first_service) % meanDRIV > SMALL_INTERVAL):
-				enter_time = curr_vehicle.serv_end + meanDRIV - (curr_vehicle.serv_end - self.first_service) % meanDRIV	
-			if control == 'full':
-				if spot2blk(stop) <= m_out:
-					enter_time += meanDRIV * (m_out + 1 - spot2blk(stop))
-				enter_time = self.check_enter_zero_long(enter_time, curr_vehicle.stop_idx)
-			self.add_event( event(enter_time - 100 * SMALL_INTERVAL, curr_vehicle, 'add_stop_idx') )
-			self.add_event( event(enter_time, new_vehicle, 'enter_system') )
+		self.add_event( event( self.curr, new_vehicle, 'enter_system') )
+		if not free_curb:
+			heappush( self.waiting, (- curr_vehicle.stop_idx) )
 		else:
-			self.add_event( event( self.curr, new_vehicle, 'enter_system') )
-			if not free_curb:
-				heappush( self.waiting, (- curr_vehicle.stop_idx) )
-			else:
-				heappush( self.waiting, curr_vehicle.stop_idx )
+			heappush( self.waiting, curr_vehicle.stop_idx )
 		return
 
 	def add_stop_idx(self, curr_vehicle):
@@ -896,68 +515,16 @@ class system():
 
 	def enter_system(self, curr_vehicle, debug_idx = None):
 
-		# if self.curr >= 4556.:
-		# 	import pdb; pdb.set_trace()
-
 		assert curr_vehicle.status == 0
 		if self.entry_blocked == self.curr:
 			self.add_event( event( self.entry_cleared, curr_vehicle, 'enter_system' ) )
 			return
 
-		if spmatch:
-			assert simType == 'cav'
-			if side == 'single' and self.inservice[0] is not None and self.inservice[0].plin_end is not None and self.inservice[0].plin_end + meanDRIV > self.curr + SMALL_INTERVAL:
-				self.entry_blocked = self.curr
-				self.entry_cleared = self.inservice[0].plin_end + meanDRIV
-				self.add_event( event( self.entry_cleared, curr_vehicle, 'enter_system') )
-				return	
-			if side == 'double' and self.inservice[0] is not None and self.inservice[0].plin_end is not None and self.inservice[0].plin_end + meanDRIV > self.curr + SMALL_INTERVAL:
-				self.entry_blocked = self.curr
-				self.entry_cleared = self.inservice[0].plin_end + meanDRIV
-				self.add_event( event( self.entry_cleared, curr_vehicle, 'enter_system') )
-				return
-			if side == 'double' and self.inservice[1] is not None and self.inservice[1].plin_end is not None and self.inservice[1].plin_end + meanDRIV > self.curr + SMALL_INTERVAL:
-				self.entry_blocked = self.curr
-				self.entry_cleared = self.inservice[1].plin_end + meanDRIV
-				self.add_event( event( self.entry_cleared, curr_vehicle, 'enter_system') )
-				return
-
-			if self.head == None:
-				self.inCount += 1
-				self.head = curr_vehicle
-				heapify(self.waiting)
-				if not free_curb:
-					curr_vehicle.assign_spot( -heappop(self.waiting) )
-				else:
-					curr_vehicle.assign_spot( heappop(self.waiting) )
-				curr_vehicle.curr_loc = LOT_LENGTH
-				if curr_vehicle.stop == 1:						
-					curr_vehicle.status = 2
-					curr_vehicle.plin_time = self.timePLIN.next()
-					curr_vehicle.plin_start = max(0., self.curr - meanDRIV)
-					curr_vehicle.plin_end = curr_vehicle.plin_time + curr_vehicle.plin_start
-					curr_vehicle.prod_time += curr_vehicle.plin_time
-					curr_vehicle.update_traj()
-					assert curr_vehicle.end_time != None
-					assert self.inservice[curr_vehicle.stop_idx - 1] is None
-					self.inservice[curr_vehicle.stop_idx - 1] = curr_vehicle
-					self.add_event( event( curr_vehicle.end_time, curr_vehicle, 'start_service') )
-					return
-				assert curr_vehicle.dest_to_stop >= curr_vehicle.curr_loc
-				curr_vehicle.update_traj()
-				assert curr_vehicle.end_time != None and curr_vehicle.end_time >= self.curr
-				self.add_event( event( curr_vehicle.end_time, curr_vehicle, 'start_pulling_in') )
-				return
-
 		# if there is no vehicle on the driving lane
 		# the replacement vehicle is assigned to the spot with the largest index
 		if self.head == None:
-			assert not spmatch
 			self.inCount += 1
 			self.head = curr_vehicle
-			if len(self.waiting) >= 3:
-				print (self.waiting)
-				import pdb; pdb.set_trace()
 			heapify(self.waiting)
 			if not free_curb:
 				curr_vehicle.assign_spot( -heappop(self.waiting) )
@@ -979,7 +546,7 @@ class system():
 		# if the last one is making an enter maneuver in to spot 2 (single) or spots 3 & 4 (double) 
 		# i.e. the loc of the last vehicle is right at the CAR_LENGTH (i.e. first lane block occupied)
 		# the replacement vehicle can enter and be assigned to spot 1 under both access control
-		if angle == 0 and mode == 'long' and (not free_curb) and car.curr_loc == CAR_LENGTH and car.status == 2 and (not spmatch or car.plin_start >= self.curr - meanDRIV - 100 * SMALL_INTERVAL):
+		if angle == 0 and mode == 'long' and (not free_curb) and car.curr_loc == CAR_LENGTH and car.status == 2:
 			stop_idx = None
 			if (-2 in self.waiting and side == 'double' and (control == 'full' or -2 == min(self.waiting))):
 				stop_idx = 2 
@@ -996,33 +563,16 @@ class system():
 					heappush(self.waiting, (-stop_idx))				
 					return
 
-				if len(self.waiting) >= 3:
-					print (self.waiting)
-					import pdb;pdb.set_trace()
 				self.inCount += 1
 				curr_vehicle.prev = car
 				car.nex = curr_vehicle
 				curr_vehicle.assign_spot( stop_idx )
 				assert curr_vehicle.stop == 1
 				assert self.inservice[curr_vehicle.stop_idx - 1] is None
-				if not spmatch:
-					curr_vehicle.update_traj()
-					assert curr_vehicle.end_time != None
-					self.add_event( event( curr_vehicle.end_time, curr_vehicle, 'start_pulling_in') )
-					return
-				else:
-					assert simType == 'cav'
-					curr_vehicle.status = 2
-					curr_vehicle.curr_loc = CAR_LENGTH
-					curr_vehicle.plin_time = self.timePLIN.next()
-					curr_vehicle.plin_start = max(0., self.curr - meanDRIV)
-					curr_vehicle.plin_end = curr_vehicle.plin_time + curr_vehicle.plin_start
-					curr_vehicle.prod_time += curr_vehicle.plin_time
-					curr_vehicle.update_traj()
-					assert curr_vehicle.end_time != None
-					self.inservice[curr_vehicle.stop_idx - 1] = curr_vehicle	
-					self.add_event( event( curr_vehicle.end_time, curr_vehicle, 'start_service') )
-					return
+				curr_vehicle.update_traj()
+				assert curr_vehicle.end_time != None
+				self.add_event( event( curr_vehicle.end_time, curr_vehicle, 'start_pulling_in') )
+				return
 
 		# if the last one is within CAR_LENGTH (i.e. first lane block occupied)
 		# the replacement vehicle cannot enter under either access control
@@ -1052,33 +602,16 @@ class system():
 					self.waiting.remove(-1)
 			
 				if stop_idx is not None:
-					if len(self.waiting) >= 3:
-						print (self.waiting)
-						import pdb; pdb.set_trace()
 					self.inCount += 1
 					curr_vehicle.prev = car
 					car.nex = curr_vehicle
 					curr_vehicle.assign_spot( stop_idx )
 					assert curr_vehicle.stop == 1
 					assert self.inservice[curr_vehicle.stop_idx - 1] is None
-					if not spmatch:
-						curr_vehicle.update_traj()
-						assert curr_vehicle.end_time != None
-						self.add_event( event( curr_vehicle.end_time, curr_vehicle, 'start_pulling_in') )
-						return
-					else:
-						assert simType == 'cav'
-						curr_vehicle.status = 2
-						curr_vehicle.curr_loc = CAR_LENGTH
-						curr_vehicle.plin_time = self.timePLIN.next()
-						curr_vehicle.plin_start = max(0., self.curr - meanDRIV)
-						curr_vehicle.plin_end = curr_vehicle.plin_time + curr_vehicle.plin_start
-						curr_vehicle.prod_time += curr_vehicle.plin_time
-						curr_vehicle.update_traj()
-						assert curr_vehicle.end_time != None
-						self.inservice[curr_vehicle.stop_idx - 1] = curr_vehicle	
-						self.add_event( event( curr_vehicle.end_time, curr_vehicle, 'start_service') )
-						return
+					curr_vehicle.update_traj()
+					assert curr_vehicle.end_time != None
+					self.add_event( event( curr_vehicle.end_time, curr_vehicle, 'start_pulling_in') )
+					return
 				else:
 					assert car_time > self.curr
 					req_time = max( req_time, car_time)	 
@@ -1086,15 +619,6 @@ class system():
 			else:
 				assert car_time > self.curr
 				req_time = max( req_time, car_time)
-
-		if spmatch and req_time <= self.curr:
-			if car.curr_loc < LOT_LENGTH + CAR_LENGTH - SMALL_INTERVAL:
-				if car.status not in [1, 6]:
-					print ('!!!!!!!!!!!!!!!!')
-					import pdb; pdb.set_trace()
-				assert car.dest_to_stop >= LOT_LENGTH + CAR_LENGTH
-				car_time = car.calc_time(LOT_LENGTH + CAR_LENGTH)
-				req_time = max( req_time, car_time )
 
 		if req_time > self.curr:
 			self.entry_blocked = self.curr
@@ -1106,9 +630,6 @@ class system():
 			import pdb; pdb.set_trace()
 
 		if control == 'partial':
-			if len(self.waiting) >= 3:
-				print (self.waiting)
-				import pdb; pdb.set_trace()
 			self.inCount += 1
 			curr_vehicle.prev = car
 			car.nex = curr_vehicle
@@ -1117,24 +638,6 @@ class system():
 				curr_vehicle.assign_spot( -heappop(self.waiting) )
 			else:
 				curr_vehicle.assign_spot( heappop(self.waiting) )
-			if spmatch:
-				assert simType == 'cav'
-				assert curr_vehicle.prev.curr_loc >= LOT_LENGTH + CAR_LENGTH - SMALL_INTERVAL
-				curr_vehicle.curr_loc = CAR_LENGTH
-				if spot2blk(curr_vehicle.stop) == 1:
-					curr_vehicle.status = 2
-					curr_vehicle.plin_time = self.timePLIN.next()
-					curr_vehicle.plin_start = max(0., self.curr - meanDRIV)
-					curr_vehicle.plin_end = curr_vehicle.plin_time + curr_vehicle.plin_start
-					curr_vehicle.prod_time += curr_vehicle.plin_time
-					curr_vehicle.update_traj()
-					assert curr_vehicle.end_time != None
-					assert self.inservice[curr_vehicle.stop_idx - 1] is None
-					self.inservice[curr_vehicle.stop_idx - 1] = curr_vehicle
-					self.add_event( event( curr_vehicle.end_time, curr_vehicle, 'start_service') )
-					return
-				else:
-					assert curr_vehicle.dest_to_stop >= curr_vehicle.curr_loc
 			curr_vehicle.update_traj()
 			assert curr_vehicle.end_time != None and curr_vehicle.end_time >= self.curr
 			self.add_event( event( curr_vehicle.end_time, curr_vehicle, 'start_pulling_in') )
@@ -1142,8 +645,6 @@ class system():
 
 		assert control == 'full'
 		assert curr_vehicle.curr_loc == 0.0
-		if spmatch:
-			curr_vehicle.curr_loc = CAR_LENGTH
 
 		# car is the last vehicle on the driving lane 
 		# and also the prev for the replacement vehicle if the latter can enter
@@ -1180,9 +681,7 @@ class system():
 				assert (car.stop - 1) * LOT_LENGTH >= curr_vehicle.curr_loc
 				if side == 'double' and J == car.stop and j != car.stop_idx:
 					j_new.append(j)
-				elif spmatch and ((car.stop - 1) * LOT_LENGTH - curr_vehicle.curr_loc) / rateDRIV >= car.pout_end - self.curr - SMALL_INTERVAL:
-					j_new.append(j)
-				elif (not spmatch) and ( ((car.stop - 1) * LOT_LENGTH - curr_vehicle.curr_loc) / rateDRIV >= max(0.0, meanPOUT - (self.curr - car.pout_start)) ):
+				elif ((car.stop - 1) * LOT_LENGTH - curr_vehicle.curr_loc) / rateDRIV >= max(0.0, meanPOUT - (self.curr - car.pout_start)):
 					j_new.append(j)
 
 			else:
@@ -1214,12 +713,8 @@ class system():
 
 			elif car.status == 5:
 				assert car.pout_start <= self.curr
-				if spmatch:
-					assert ( ((car.stop - 1) * LOT_LENGTH - curr_vehicle.curr_loc) / rateDRIV < car.pout_end - self.curr )
-					car_time = car.pout_end - self.curr - ((car.stop - 1) * LOT_LENGTH - curr_vehicle.curr_loc) / rateDRIV
-				if not spmatch:
-					assert ( ((car.stop - 1) * LOT_LENGTH - curr_vehicle.curr_loc) / rateDRIV < meanPOUT - (self.curr - car.pout_start)  )
-					car_time = meanPOUT - (self.curr - car.pout_start) - ((car.stop - 1) * LOT_LENGTH - curr_vehicle.curr_loc) / rateDRIV
+				assert ( ((car.stop - 1) * LOT_LENGTH - curr_vehicle.curr_loc) / rateDRIV < meanPOUT - (self.curr - car.pout_start)  )
+				car_time = meanPOUT - (self.curr - car.pout_start) - ((car.stop - 1) * LOT_LENGTH - curr_vehicle.curr_loc) / rateDRIV
 
 			else:
 				assert car.status == 1
@@ -1260,12 +755,7 @@ class system():
 					assert (car.stop - 1) * LOT_LENGTH >= curr_vehicle.curr_loc
 					if side == 'double' and J == car.stop and j != car.stop_idx:
 						pass
-					elif spmatch and ( ((car.stop - 1) * LOT_LENGTH - curr_vehicle.curr_loc) / rateDRIV < car.pout_end - self.curr ):
-						j_new = j_new[:idx]
-						if idx == 0:
-							car_time = max(car_time, car.pout_end - self.curr - ((car.stop - 1) * LOT_LENGTH - curr_vehicle.curr_loc) / rateDRIV) 
-						break
-					elif not spmatch and ( ((car.stop - 1) * LOT_LENGTH - curr_vehicle.curr_loc) / rateDRIV < max(0.0, meanPOUT - (self.curr - car.pout_start)) ):
+					elif ((car.stop - 1) * LOT_LENGTH - curr_vehicle.curr_loc) / rateDRIV < max(0.0, meanPOUT - (self.curr - car.pout_start)):
 						j_new = j_new[:idx]
 						if idx == 0:
 							car_time = max(car_time, meanPOUT - (self.curr - car.pout_start) - ((car.stop - 1) * LOT_LENGTH - curr_vehicle.curr_loc) / rateDRIV)
@@ -1311,74 +801,20 @@ class system():
 			
 		curr_vehicle.prev = last
 		last.nex = curr_vehicle
-		if spmatch:
-			assert simType == 'cav'
-			assert curr_vehicle.prev.curr_loc >= LOT_LENGTH + CAR_LENGTH - SMALL_INTERVAL
-			assert curr_vehicle.curr_loc == CAR_LENGTH
-			if spot2blk(curr_vehicle.stop) == 1:
-				curr_vehicle.status = 2
-				curr_vehicle.plin_time = self.timePLIN.next()
-				curr_vehicle.plin_start = max(0., self.curr - meanDRIV)
-				curr_vehicle.plin_end = curr_vehicle.plin_time + curr_vehicle.plin_start
-				curr_vehicle.prod_time += curr_vehicle.plin_time
-				curr_vehicle.update_traj()
-				assert curr_vehicle.end_time != None
-				assert self.inservice[curr_vehicle.stop_idx - 1] is None
-				self.inservice[curr_vehicle.stop_idx - 1] = curr_vehicle
-				self.add_event( event( curr_vehicle.end_time, curr_vehicle, 'start_service') )
-				return
-			else:
-				assert curr_vehicle.dest_to_stop >= curr_vehicle.curr_loc
-		if not spmatch:
-			assert curr_vehicle.curr_loc == 0.0
+		assert curr_vehicle.curr_loc == 0.0
 		curr_vehicle.update_traj()
 		assert curr_vehicle.end_time != None and curr_vehicle.end_time >= self.curr
 		self.add_event( event( curr_vehicle.end_time, curr_vehicle, 'start_pulling_in') )
 		return
-
-	def check_enter_zero_long(self, enter_time, stop_idx):
-
-		assert spmatch and control == 'full'
-		car = self.head
-		while car is not None:
-			if (stop_idx <= car.stop_idx) or (car.status == 6):
-				pass
-			elif car.status == 2 and car.stop == 1:
-				assert car.plin_start <= self.curr
-				enter_time = max(enter_time, car.plin_end + meanDRIV)
-			elif car.status == 2:
-				assert car.plin_start <= self.curr
-				if (car.stop - 1) * LOT_LENGTH / rateDRIV < max(0.0, meanPLIN - (self.curr - car.plin_start)):
-					enter_time = max(enter_time, car.plin_start + meanPLIN - (car.stop - 1) * LOT_LENGTH / rateDRIV)
-			elif car.status == 5 and car.stop == 1:
-				assert car.pout_start <= self.curr <= car.pout_end
-				enter_time = max(enter_time, car.pout_end + meanDRIV)
-			elif car.status == 5:
-				assert car.pout_start <= self.curr <= car.pout_end
-				if ((car.stop - 1) * LOT_LENGTH - CAR_LENGTH) / rateDRIV < car.pout_end - self.curr:
-					enter_time = max(enter_time, car.pout_end - ((car.stop - 1) * LOT_LENGTH - CAR_LENGTH) / rateDRIV)
-			else:
-				assert car.status == 1
-				assert car.stop >= 2 
-				if enter_time < self.curr + meanPLIN - car.curr_loc / rateDRIV - 10 * SMALL_INTERVAL:
-					enter_time = self.curr + meanPLIN - car.curr_loc / rateDRIV
-			car = car.nex
-		return enter_time
-
+	
 	def check_lane_zero_long(self, curr_vehicle, first_attempt, delay_reason = None, delay_status = None, delay_speed = None, curr_time = None):
-
-		# if self.curr >= 88763. and curr_vehicle.stop_idx == 1:
-		# 	import pdb; pdb.set_trace()
 
 		assert angle == 0 and mode == 'long'
 
 		delayed = False
 		if curr_time is None:
 			curr_time = self.curr
-			if spmatch and first_attempt:
-				est_pout_start = curr_vehicle.serv_end
-			else:
-				est_pout_start = curr_time
+			est_pout_start = curr_time
 		else:
 			assert curr_time > self.curr
 			est_pout_start = curr_time
@@ -1399,10 +835,7 @@ class system():
 
 			elif car.curr_loc >= stop * LOT_LENGTH + CAR_LENGTH - SMALL_INTERVAL:
 				prev = car
-
-			elif spmatch and car.stop == stop and car.status == 6:
-				prev = car
-
+				
 			elif car.status == 2 and car.stop == stop + 1:
 				if not ((side == 'single' and stop <= self.N - 1) or (side == 'double' and stop <= self.half_N - 1)):
 					import pdb; pdb.set_trace()
@@ -1434,13 +867,7 @@ class system():
 					break
 
 				if car.stop_idx in out_range(curr_vehicle.stop_idx, self.N):
-					if spmatch and first_attempt and np.abs( car.pout_end - (est_pout_start + meanPOUT - (est_pout_start - self.first_service) % meanDRIV) ) < 100 * SMALL_INTERVAL:
-						assert simType == 'cav'
-						pass
-					elif spmatch and 0 <= curr_time - car.pout_start < SMALL_INTERVAL:
-						assert simType == 'cav'
-						pass
-					elif car.pout_end - curr_time > SMALL_INTERVAL:
+					if car.pout_end - curr_time > SMALL_INTERVAL:
 						delayed = True
 						assert car.pout_end > curr_time
 						if curr_vehicle.idx == VEHICLE_IDX and car.pout_end > req_time:
@@ -1448,31 +875,19 @@ class system():
 							delay_status = 5
 						req_time = max(req_time, car.pout_end)
 
-				if spmatch:
-					car_time = car.pout_end + ((stop - 1) * LOT_LENGTH - car.curr_loc) / rateDRIV
-					if (first_attempt and car_time < est_pout_start + meanPOUT - (est_pout_start - self.first_service) % meanDRIV - 100 * SMALL_INTERVAL) or ((not first_attempt) and car_time < curr_time + meanPOUT - 100 * SMALL_INTERVAL):
-						delayed = True
-						car_time = car.calc_time( stop * LOT_LENGTH + CAR_LENGTH )
-						assert car_time > curr_time
-						if idx == VEHICLE_IDX and car_time > req_time:
-							delay_reason = 3
-							delay_status = 5
-						req_time = max( req_time, car_time )
-
-				else:
-					car_time = car.pout_start + meanPOUT + ((stop - 1) * LOT_LENGTH - car.curr_loc) / rateDRIV
-					if car_time < curr_time + meanPOUT:
-						delayed = True
-						car_time = car.calc_time( stop * LOT_LENGTH + CAR_LENGTH )
-						assert car_time > curr_time
-						if idx == VEHICLE_IDX and car_time > req_time:
-							delay_reason = 3
-							delay_status = 5
-						req_time = max( req_time, car_time )
+				car_time = car.pout_start + meanPOUT + ((stop - 1) * LOT_LENGTH - car.curr_loc) / rateDRIV
+				if car_time < curr_time + meanPOUT:
+					delayed = True
+					car_time = car.calc_time( stop * LOT_LENGTH + CAR_LENGTH )
+					assert car_time > curr_time
+					if idx == VEHICLE_IDX and car_time > req_time:
+						delay_reason = 3
+						delay_status = 5
+					req_time = max( req_time, car_time )
 
 			elif car.status == 2:
 				assert (car.stop < stop) or (car.stop == stop and side == 'double')
-				if not spmatch and car.stop == stop:
+				if car.stop == stop:
 					break
 				stopped = True
 
@@ -1499,7 +914,7 @@ class system():
 					assert car.prev.status == 2
 					car_time = car.calc_time( (stop - 1) * LOT_LENGTH )
 
-				if ((not spmatch or not first_attempt) and car_time < curr_time + meanPOUT - 100 * SMALL_INTERVAL) or (spmatch and first_attempt and car_time < est_pout_start + meanPOUT - (est_pout_start - self.first_service) % meanDRIV - 100 * SMALL_INTERVAL):
+				if car_time < curr_time + meanPOUT - 100 * SMALL_INTERVAL:
 					delayed = True
 					if not car.end_time > curr_time - 3 * SMALL_INTERVAL:
 						if curr_time > self.curr:
@@ -1538,7 +953,7 @@ class system():
 						assert car.prev.status == 2
 						car_time = max(car.prev.plin_end, self.curr + ((car.prev.stop - 1) * LOT_LENGTH - car.curr_loc) / rateDRIV) + (stop - car.prev.stop) * LOT_LENGTH / rateDRIV 
 
-					if ((not spmatch or not first_attempt) and car_time < curr_time + meanPOUT - 100 * SMALL_INTERVAL) or (spmatch and first_attempt and car_time < est_pout_start + meanPOUT - (est_pout_start - self.first_service) % meanDRIV - 100 * SMALL_INTERVAL):
+					if car_time < curr_time + meanPOUT - 100 * SMALL_INTERVAL:
 						delayed = True
 						car_time = car.calc_time( stop * LOT_LENGTH + CAR_LENGTH )
 						if not car_time > curr_time:
@@ -1630,10 +1045,7 @@ class vehicle():
 		else:
 			assert (angle == 90)
 			self.block_idx = spot2blk(self.stop)
-			if spmatch:
-				self.dest_to_stop = self.block_idx * CAR_LENGTH
-			else:
-				self.dest_to_stop = (self.stop + dgap) * LOT_LENGTH
+			self.dest_to_stop = (self.stop + dgap) * LOT_LENGTH
 
 	def start_in(self):
 		assert self.curr_loc == self.dest_to_stop
@@ -1648,16 +1060,7 @@ class vehicle():
 	def start_service(self):
 		assert (self.status == 2)
 		self.status = 3
-		if spmatch:
-			try:
-				self.serv_time = self.sys.service_times[str(self.stop_idx)][0]
-				self.sys.service_times[str(self.stop_idx)] = self.sys.service_times[str(self.stop_idx)][1:]
-			except:
-				# import pdb; pdb.set_trace()
-				self.serv_time = self.sys.timeSERV.next()
-		else:
-			self.serv_time = self.sys.timeSERV.next()
-
+		self.serv_time = self.sys.timeSERV.next()
 		self.serv_end = self.serv_time + self.sys.curr
 		self.serv_start = self.sys.curr
 		self.prod_time += self.serv_time
@@ -1666,9 +1069,7 @@ class vehicle():
 	def start_out(self):
 		assert self.status == 4
 		self.status = 5
-		if spmatch and angle == 90:
-			self.curr_loc = self.block_idx * CAR_LENGTH
-		elif angle == 90:
+		if angle == 90:
 			self.curr_loc = (self.stop + dgap) * LOT_LENGTH
 		else:
 			self.curr_loc = self.stop * LOT_LENGTH
@@ -1689,20 +1090,6 @@ class vehicle():
 
 		cp = self.traj.head
 
-		if spmatch:
-			if self.curr_loc == loc:
-				# import pdb; pdb.set_trace()
-				return self.sys.curr
-			while cp.nex != None and cp.nex.data.x < loc:
-				cp = cp.nex
-			if cp.data.v == 0.0:
-				import pdb; pdb.set_trace()
-			if cp.nex is None:
-				assert cp.data.v == 'D'
-				# import pdb; pdb.set_trace()
-				return cp.data.t
-			# import pdb; pdb.set_trace()
-			return cp.data.t + (loc - cp.data.x) / cp.data.v
 		# if the curr_loc is the target loc,
 		# then find the last time that it stays here
 		# i.e. the first time that it starts to have nonzero speed.
@@ -1761,16 +1148,11 @@ class vehicle():
 		assert (self.status != 3) and (self.status != 4)
 
 		if (self.status == 2):
-			if spmatch and spot2blk(self.stop) == 1:
-				assert self.curr_loc == CAR_LENGTH
-			else:
-				assert self.curr_loc == self.dest_to_stop
+			assert self.curr_loc == self.dest_to_stop
 			return
 
 		if (self.status == 5):
-			if spmatch and angle == 90:
-				assert self.curr_loc == self.block_idx * CAR_LENGTH
-			elif angle == 90:
+			if angle == 90:
 				assert self.curr_loc == (self.stop + dgap) * LOT_LENGTH
 			else:
 				assert self.curr_loc == self.stop * LOT_LENGTH
@@ -1836,10 +1218,7 @@ class vehicle():
 
 		if self.status == 2:
 			# i.e. the vehicle has started pulling in but has not started service
-			if spmatch and spot2blk(self.stop) == 1:
-				assert self.curr_loc == CAR_LENGTH
-			else:
-				assert (self.curr_loc == self.dest_to_stop)
+			assert (self.curr_loc == self.dest_to_stop)
 			if self.plin_end > self.sys.curr:
 				self.end_time = self.plin_end
 			else:
@@ -1863,7 +1242,7 @@ class vehicle():
 
 		if self.curr_loc == self.dest_to_stop and self.status == 1:
 			if self.end_time is None:
-				assert (self.stop == 1) or (spmatch and self.stop == 2) or (angle == 90 and self.block_idx == 1) or (angle == 90 and spmatch and self.block_idx == 2)
+				assert (self.stop == 1) or (angle == 90 and self.block_idx == 1)
 				self.end_time = self.sys.curr
 			if end_time is not None:
 				assert self.end_time >= end_time
@@ -1895,15 +1274,9 @@ class vehicle():
 			self.traj.addEnd( changePoint(self.curr_loc, start_t, self.driv) )
 			self.end_time = start_t + (self.dest_to_stop - self.curr_loc) / self.driv
 			if (end_time is not None) and (self.end_time < end_time):
-				if spmatch and self.status == 5 and self.idx == self.sys.curr_vehicle.idx:
+				if not (self.end_time >= end_time - 45 * SMALL_INTERVAL):
 					import pdb; pdb.set_trace()
-					if not ( np.abs(end_time - self.end_time - (self.sys.curr - self.sys.first_service) % meanDRIV) < SMALL_INTERVAL or (self.serv_end == self.pout_start < self.sys.curr and np.abs(end_time - self.end_time) < SMALL_INTERVAL)):
-						import pdb; pdb.set_trace()
-					pass
-				else:
-					if not (self.end_time >= end_time - 45 * SMALL_INTERVAL):
-						import pdb; pdb.set_trace()
-					self.end_time = end_time
+				self.end_time = end_time
 			self.traj.addEnd( changePoint(self.dest_to_stop, self.end_time, 'D') )
 			return
 
@@ -1920,15 +1293,9 @@ class vehicle():
 			self.traj.addEnd( changePoint(self.curr_loc, start_t, self.driv) )
 			self.end_time = start_t + (self.dest_to_stop - self.curr_loc) / self.driv
 			if (end_time is not None) and (self.end_time < end_time):
-				if spmatch and self.status == 5 and self.idx == self.sys.curr_vehicle.idx:
+				if not (self.end_time >= end_time - 99 * SMALL_INTERVAL):
 					import pdb; pdb.set_trace()
-					if not ( np.abs(end_time - self.end_time - (self.sys.curr - self.sys.first_service) % meanDRIV) < SMALL_INTERVAL or (self.serv_end == self.pout_start < self.sys.curr and np.abs(end_time - self.end_time) < SMALL_INTERVAL)):
-						import pdb; pdb.set_trace()
-					pass
-				else:
-					if not (self.end_time >= end_time - 99 * SMALL_INTERVAL):
-						import pdb; pdb.set_trace()
-					self.end_time = end_time
+				self.end_time = end_time
 			self.traj.addEnd( changePoint(self.dest_to_stop, self.end_time, 'D') )
 			return
 
@@ -2068,7 +1435,7 @@ class vehicle():
 
 		if self.curr_loc == self.dest_to_stop and self.status == 1:
 			if self.end_time is None:
-				assert (self.stop == 1) or (spmatch and self.stop == 2)
+				assert (self.stop == 1)
 				self.end_time = self.sys.curr
 			if end_time is not None:
 				assert self.end_time >= end_time
@@ -2092,15 +1459,9 @@ class vehicle():
 					self.traj.addEnd( changePoint(start_x, start_t, self.driv) )
 					self.end_time = start_t + (self.dest_to_stop - start_x) / self.driv
 					if (end_time is not None) and (self.end_time < end_time):
-						if spmatch and self.status == 5 and self.idx == self.sys.curr_vehicle.idx:
+						if not (self.end_time >= end_time - 81 * SMALL_INTERVAL):
 							import pdb; pdb.set_trace()
-							if not ( np.abs(end_time - self.end_time - (self.sys.curr - self.sys.first_service) % meanDRIV) < SMALL_INTERVAL or (self.serv_end == self.pout_start < self.sys.curr and np.abs(end_time - self.end_time) < SMALL_INTERVAL)):
-								import pdb; pdb.set_trace()
-							pass
-						else:
-							if not (self.end_time >= end_time - 81 * SMALL_INTERVAL):
-								import pdb; pdb.set_trace()
-							self.end_time = end_time
+						self.end_time = end_time
 					self.traj.addEnd( changePoint(self.dest_to_stop, self.end_time, 'D'))
 					return
 				elif (cp.data.v < self.driv):
@@ -2184,15 +1545,9 @@ class vehicle():
 					self.traj.addEnd( changePoint(iter_x, iter_t, self.driv) )
 					self.end_time = iter_t + (self.dest_to_stop - iter_x) / self.driv
 					if (end_time is not None) and (self.end_time < end_time):
-						if spmatch and self.status == 5 and self.idx == self.sys.curr_vehicle.idx:
+						if not (self.end_time >= end_time - 99 * SMALL_INTERVAL):
 							import pdb; pdb.set_trace()
-							if not ( np.abs(end_time - self.end_time - (self.sys.curr - self.sys.first_service) % meanDRIV) < SMALL_INTERVAL or (self.serv_end == self.pout_start < self.sys.curr and np.abs(end_time - self.end_time) < SMALL_INTERVAL)):
-								import pdb; pdb.set_trace()
-							pass
-						else:
-							if not (self.end_time >= end_time - 99 * SMALL_INTERVAL):
-								import pdb; pdb.set_trace()
-							self.end_time = end_time
+						self.end_time = end_time
 					self.traj.addEnd( changePoint(self.dest_to_stop, self.end_time, 'D'))
 					return
 
@@ -2283,15 +1638,9 @@ class vehicle():
 			if (cp.nex is None) | (iter_x >= self.dest_to_stop - SMALL_INTERVAL): 
 				self.end_time = start_t + (self.dest_to_stop - start_x) / self.driv
 				if (end_time is not None) and (self.end_time < end_time):
-					if spmatch and self.status == 5 and self.idx == self.sys.curr_vehicle.idx:
+					if not (self.end_time >= end_time - 92 * SMALL_INTERVAL):
 						import pdb; pdb.set_trace()
-						if not ( np.abs(end_time - self.end_time - (self.sys.curr - self.sys.first_service) % meanDRIV) < SMALL_INTERVAL or (self.serv_end == self.pout_start < self.sys.curr and np.abs(end_time - self.end_time) < SMALL_INTERVAL)):
-							import pdb; pdb.set_trace()
-						pass
-					else:
-						if not (self.end_time >= end_time - 92 * SMALL_INTERVAL):
-							import pdb; pdb.set_trace()
-						self.end_time = end_time
+					self.end_time = end_time
 				self.traj.addEnd( changePoint(self.dest_to_stop, self.end_time, 'D'))
 				return
 
