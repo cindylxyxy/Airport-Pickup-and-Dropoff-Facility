@@ -100,7 +100,7 @@ def Tria(rate, low = None, high = None, seed = None):
 	while True:
 		yield curr.triangular(low, high, mode)
 
-# for spped
+# for speed
 def Cons(mean, seed = None):
 	# returning rate
 	while True:
