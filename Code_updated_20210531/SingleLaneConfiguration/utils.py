@@ -2,8 +2,7 @@
 # Last updated: May 31, 2021 by Xinyu Liu
 # This file defines useful helper functions and objects for trajectory-based simulation.
 
-########################################################################################################################################################
-from math import ceil, floor
+########################################################################################################################################################from math import ceil, floor
 from collections import *
 from params import *
 import random 
@@ -101,7 +100,7 @@ def Tria(rate, low = None, high = None, seed = None):
 	while True:
 		yield curr.triangular(low, high, mode)
 
-# for spped
+# for speed
 def Cons(mean, seed = None):
 	# returning rate
 	while True:

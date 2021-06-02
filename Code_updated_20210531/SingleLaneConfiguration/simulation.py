@@ -26,7 +26,6 @@ print ('loading spot configuration:', 'Lot length is %s, lot width is %s, and la
 print ('number of hours in simulation:', SIM_HOUR)
 print ('number of simulation iterations:', SIM_ITER) 
 print ('input to distributions:', 'meanSERV is %s, speed is %s, meanPOUT is %s, and meanPLIN is %s'%(meanSERV, rateDRIV, meanPOUT, meanPLIN) ) 
-print ('sample path match?', spmatch)
 sys.stdout.flush()
 
 if (not debug):
@@ -111,9 +110,7 @@ for N in range(1, 1 + LOT_TOTAL):
 
 		else:
 			assert car.status == 6
-			if spmatch and angle == 90:
-				start_x = car.block_idx * CAR_LENGTH
-			elif angle == 90:
+			if angle == 90:
 				start_x = (car.stop + dgap) * LOT_LENGTH
 			else:
 				start_x = car.stop * LOT_LENGTH

@@ -29,7 +29,6 @@ SIM_ITER = 20
 # WARNING: Unintended changes to this section can have unexpected effects to the simulation results.
 
 debug = False
-spmatch = False
 VEHICLE_IDX = None
 control = 'partial' 
 # control = 'full'
@@ -42,14 +41,6 @@ angle = 0
 mode = 'singlelane'
 
 WARMUP_HOUR = 2 # hr
-
-if spmatch:
-	suffix += 'spmatch'
-	assert simType == 'cav'
-	WARMUP_HOUR = 0 # hr
-	SIM_HOUR = 100 # hr
-	SIM_ITER = 1
-
 WARMUP_UNIT = 3600 * WARMUP_HOUR # sec
 SIM_UNIT = 3600 * SIM_HOUR # sec
 if side == 'single':
