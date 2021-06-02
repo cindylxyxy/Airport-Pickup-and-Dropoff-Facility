@@ -148,58 +148,6 @@ class system():
 	def add_event(self, event):
 		heappush( self.eventheap, event) 
 
-	def state_print(self):
-
-		print (self.curr, self.curr_vehicle.stop_idx, self.curr_typ)
-		x = []
-		if side == 'single':
-			y = [0 for _ in range(spot2blk(self.N))]
-		else:
-			assert side == 'double'
-			y = [0 for _ in range(spot2blk(self.half_N))]
-		if not (angle == 0 and mode == 'long'):
-			y.append(0)
-
-		for car in self.inservice:
-			if car is None:
-				x.append(0)
-			elif car.status == 3:
-				x.append(1)
-			elif car.status in [3.5, 4]:
-				x.append(2)
-			elif car.status == 2:
-				x.append(m_in + m_out)
-			else:
-				assert car.status == 5
-				x.append(3)
-
-		car = self.head
-		while car is not None:
-			if car.status in [1, 6]:
-				car.update_loc()
-				if np.abs( car.curr_loc % CAR_LENGTH - CAR_LENGTH ) < 1:
-					lane_block = ceil(car.curr_loc / CAR_LENGTH)
-				else:
-					lane_block = floor( car.curr_loc / CAR_LENGTH )
-				if lane_block > len(y):
-					print ('one vehicle is leaving ...')
-				else:
-					if y[lane_block - 1] != 0:
-						import pdb; pdb.set_trace()
-					if car.status == 1:
-						y[lane_block - 1] = car.stop_idx
-					else:
-						y[lane_block - 1] = self.N + 1
-			car = car.nex
-
-		print (x)
-		print (y)
-
-		if self.N <= 8:
-			for idx in range(len(x)):
-				if x[idx] == 1:
-					print (idx + 1, self.inservice[idx].serv_end)
-
 	def debug_print(self):
 
 		print (self.curr, self.curr_vehicle.stop_idx, self.curr_typ)
@@ -299,7 +247,7 @@ class system():
 				import pdb; pdb.set_trace()
 
 			if self.debug:
-				self.state_print()
+				self.debug_print()
 				if curr_typ == 'enter_system' and curr_vehicle.idx is not None:
 					import pdb; pdb.set_trace()				
 
@@ -469,9 +417,6 @@ class system():
 
 	def prepare_pulling_out(self, curr_vehicle):
 
-		# if self.curr >= 255. and curr_vehicle.stop_idx == 1:
-		# 	import pdb; pdb.set_trace()
-
 		stop = curr_vehicle.stop
 		assert self.inservice[curr_vehicle.stop_idx - 1] == curr_vehicle
 
@@ -580,9 +525,6 @@ class system():
 		if self.head == None:
 			self.inCount += 1
 			self.head = curr_vehicle
-			if len(self.waiting) >= 3:
-				print (self.waiting)
-				import pdb; pdb.set_trace()
 			heapify(self.waiting)
 			if not free_curb:
 				curr_vehicle.assign_spot( -heappop(self.waiting) )
@@ -621,9 +563,6 @@ class system():
 					heappush(self.waiting, (-stop_idx))				
 					return
 
-				if len(self.waiting) >= 3:
-					print (self.waiting)
-					import pdb;pdb.set_trace()
 				self.inCount += 1
 				curr_vehicle.prev = car
 				car.nex = curr_vehicle
@@ -663,9 +602,6 @@ class system():
 					self.waiting.remove(-1)
 			
 				if stop_idx is not None:
-					if len(self.waiting) >= 3:
-						print (self.waiting)
-						import pdb; pdb.set_trace()
 					self.inCount += 1
 					curr_vehicle.prev = car
 					car.nex = curr_vehicle
@@ -694,9 +630,6 @@ class system():
 			import pdb; pdb.set_trace()
 
 		if control == 'partial':
-			if len(self.waiting) >= 3:
-				print (self.waiting)
-				import pdb; pdb.set_trace()
 			self.inCount += 1
 			curr_vehicle.prev = car
 			car.nex = curr_vehicle

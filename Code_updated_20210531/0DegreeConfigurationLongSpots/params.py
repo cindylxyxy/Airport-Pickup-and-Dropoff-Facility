@@ -33,7 +33,6 @@ SIM_ITER = 20
 # WARNING: Unintended changes to this section can have unexpected effects to the simulation results.
 
 debug = False
-spmatch = False
 
 # assignment = 'dynamic'
 # assignment = 'upfront'
@@ -53,14 +52,6 @@ mode = 'long'
 # mode = 'singlelane'
 
 WARMUP_HOUR = 2 # hr
-
-if spmatch:
-	suffix += 'spmatch'
-	assert simType == 'cav'
-	WARMUP_HOUR = 0 # hr
-	SIM_HOUR = 100 # hr
-	SIM_ITER = 1
-
 WARMUP_UNIT = 3600 * WARMUP_HOUR # sec
 SIM_UNIT = 3600 * SIM_HOUR # sec
 
@@ -119,14 +110,11 @@ rateDRIV = 44./3. # ft/sec
 CAR_LENGTH = LOT_LENGTH * nUnit # ft
 meanDRIV = CAR_LENGTH / rateDRIV # time to drive through one boarding spot in sec
 # meanPOUT += meanDRIV
-if (angle == 0 and mode == 'short') or (angle == 90 and spmatch):
+if (angle == 0 and mode == 'short'):
 	meanPLIN += meanDRIV
 m_out = int( round(meanPOUT / meanDRIV) )
 m_in = int( round(meanPLIN / meanDRIV) ) 
 g_out = max(m_out, 3)
-if spmatch:
-	meanPOUT = m_out * meanDRIV
-	meanPLIN = m_in * meanDRIV
 
 rateSERV = 1. / meanSERV
 ratePOUT = 1. / meanPOUT
