@@ -11,4 +11,4 @@ The input parameters are initiated in the file 'params.py'. For a full list of i
   5. dirname = '' for any desired directory to save the output. You may change to any directory of choice.
   6. suffix = '' for any desired suffix to differentiate the output files of multiple simulation runs with different input combinations. You may change to any suffix of choice.
 
-The 'eventSingleNew.py' file specifies the event definitions, tracks the vehicle status, and updates the vehicle trajectories under spot assignment rule - Alternative 1. The 'eventDP2.py' file is a variation under Alternative 2. The 'utils.py' file stores helper functions and objects.
+The 'eventSingleNew.py' file specifies the event definitions, tracks the vehicle status, and updates the vehicle trajectories. The 'utils.py' file stores helper functions and objects.
