@@ -1,8 +1,8 @@
-This file documents the simulation details of double parking.
+This file documents the simulation details for configurations that allow double parking.
 
-To run the simulation for double parking configurations, in your computer or server, first make sure that you are under the correct direcotry '../PickupDropoffFacility/Code_updated_20210531/DoubleParking/', then use the command 'python run simulation.py' to start the simulation. 
+To run the simulation for double parking configurations, in your computer or server, first make sure that you are under the correct directory '../PickupDropoffFacility/Code_updated_20210531/DoubleParking/', then use the command 'python simulation.py' to run the simulation. 
 
-The input parameters are initiated in the file 'params.py'. For a full list of input to the simulation model, please refer to our paper. We will only include here a list of input that is easy to change and experiment for the general audience who hopes to see the simulation results under a spectrum of settings. Changes to the other items in the input list will requre thorough understanding towards the model, careful calibration of the input data, and very likely but not necessarily some debugging. Such items include but not are not limited to the follows: The simulation for double parking assumes that each boarding spot is configured similarly to a 0-degree long spot, in terms of the orientation, width, and length of each spot. Only partial access control is considered for double parking mode. For a hassle-free start, you can work with the following input parameters. Note that the first alternative for each item is the default as written in the 'params.py' file.
+The input parameters are initiated in the file 'params.py'. For a full list of input to the simulation model, please refer to our paper. We will only include here a list of input that is easy to change and experiment for the general audience who hopes to see the simulation results under a spectrum of settings. Changes to the other items in the input list will require thorough understanding towards the model, careful calibration of the input data, and very likely but not necessarily some debugging. Such items include but not are not limited to the follows: The simulation for double parking assumes that each boarding spot is configured similarly to a 0-degree long spot, in terms of the orientation, width, and length of each spot. Only partial access control is considered for double parking mode. For a hassle-free start, you can work with the following input parameters. Note that the first alternative for each item is the default as written in the 'params.py' file.
   
   1. version = 'v1' or 'v2' for spot assignment rule, with 'v1' for Alternative 1 (as explained below) and 'v2' for Alternative 2. 
 	
@@ -10,15 +10,15 @@ The input parameters are initiated in the file 'params.py'. For a full list of i
 	
   3. simType = 'exp' for service time distribution being Exponential, vehicle desired speed distribution being Continuous Uniform, and enter/exit maneuver time distribution being Exponential. Other alternatives are 'cav' for service time distribution being Exponential, vehicle desired speed distribution being Constant, and enter/exit maneuver time distribution being Constant; and 'unif' for service time distribution being Continuous Uniform, vehicle desired speed distribution being Continuous Uniform, and enter/exit maneuver time distribution being Continuous Uniform.
 	
-  4. SIM_HOUR = 20 for duration of simulation in each iteration being 20 hrs. You may change to any integer of choice. Please make sure your input is in integral form.
+  4. SIM_HOUR = 20 for duration of simulation in each iteration being 20 hrs. You may change to any integer of choice. Please make sure that your input is in integral form.
 	
-  5. SIM_ITER = 20 for the number of iterations in the simulation being 20. You may change to any integer of choice. Please make sure your input is in integral form.
+  5. SIM_ITER = 20 for the number of iterations in the simulation being 20. You may change to any integer of choice. Please make sure that your input is in integral form.
 	
   6. dirname = '' for any desired directory to save the output. You may change to any directory of choice. 
 	
   7. suffix = '' for any desired suffix to differentiate the output files of multiple simulation runs with different input combinations. You may change to any suffix of choice. 
 
-The 'eventDP1.py' file specifies the event definitions, tracks the vehicle status, and updates the vehicle trajectories under spot assignment rule - Alternative 1. The 'eventDP2.py' file is a variation under Alternative 2. The 'utils.py' file stores helper functions and objects.
+The 'eventDP1.py' file specifies the event definitions, tracks the vehicle status, and updates the vehicle trajectories under spot assignment rule - Alternative 1. The 'eventDP2.py' file is a variation under Alternative 2. The 'utils.py' file stores the helper functions and objects.
 
 The detailed dynamics of the trajectory-based simulation for Double Parking simulation are recorded below. 
 
