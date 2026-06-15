@@ -5,4 +5,6 @@ https://journals.sagepub.com/doi/10.1177/03611981211037544
 and shall be cited as   
     1. Kleywegt AJ, Liu X. Throughput Capacity Comparison for Airport Pickup and Dropoff Facilities. Transportation Research Record. September 2021. doi:10.1177/03611981211037544
   
- 
+## License
+This project is licensed under the GNU Lesser General Public License v2.1 only.
+See the [LICENSE](LICENSE) file for details.
